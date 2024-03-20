@@ -7,7 +7,6 @@
 
 #import "JsonObject.h"
 #include <objc/runtime.h>
-#include "binary_codec.h"
 
 @implementation NSUserDefaults (jsonObject)
 
@@ -355,19 +354,10 @@ FAILED_TO_DECODE:
 #pragma mark - Save Memory Status
 
 - (NSInteger)serializeToFile:(NSString *)filePath error:(NSError *_Nullable*_Nullable)error {
-    return [JsonObject write:self toFile:filePath error:error encrypted:NO];
-}
-
-- (NSInteger)serializeToFile:(NSString *)filePath error:(NSError *_Nullable*_Nullable)error encrypted:(BOOL)encrypted {
-    return [JsonObject write:self toFile:filePath error:error encrypted:encrypted];
+    return [JsonObject write:self toFile:filePath error:error];
 }
 
 + (NSInteger)write:(id<JsonSerialization>)serializableObject toFile:(NSString *)filePath error:(NSError *__autoreleasing  _Nullable *)error {
-    return [self write:serializableObject toFile:filePath error:error encrypted:NO];
-}
-
-+ (NSInteger)write:(id<JsonSerialization>)serializableObject toFile:(NSString *)filePath error:(NSError *__autoreleasing  _Nullable *)error
-    encrypted:(BOOL)encrypted {
     id serializedObject = [serializableObject serializedObject];
     if (!serializedObject) {
         return 0;
@@ -386,17 +376,9 @@ FAILED_TO_DECODE:
         if (error != NULL) {
             *error = [NSError errorWithDomain:NSOSStatusErrorDomain
                                          code:-10875
-                                     userInfo:@{NSLocalizedDescriptionKey:@"文件为空"}];
+                                     userInfo:@{NSLocalizedDescriptionKey:@"File does not exist or is empty."}];
         }
         return 0;
-    }
-    
-    if (encrypted) {
-        int length = (int)data.length;
-        Byte *buffer = malloc(length);
-        encrypt_binary(data.bytes, buffer, length);
-        data = [NSData dataWithBytes:buffer length:length];
-        free(buffer);
     }
     
     BOOL result = [data writeToFile:filePath options:NSDataWritingAtomic error:&error1];
@@ -410,7 +392,7 @@ FAILED_TO_DECODE:
         if (error != NULL) {
             *error = [NSError errorWithDomain:NSOSStatusErrorDomain
                                          code:-36
-                                     userInfo:@{NSLocalizedDescriptionKey:@"磁盘I/O操作失败"}];
+                                     userInfo:@{NSLocalizedDescriptionKey:@"I/O Failure."}];
         }
         return 0;
     }
@@ -420,12 +402,8 @@ FAILED_TO_DECODE:
 #pragma mark - Restore Memory Status
 
 - (instancetype)initWithContentOfFile:(NSString *)filePath error:(NSError * _Nullable __autoreleasing *)error {
-    return [self initWithContentOfFile:filePath error:error encrypted:NO];
-}
-
-- (instancetype)initWithContentOfFile:(NSString *)filePath error:(NSError * _Nullable __autoreleasing *)error encrypted:(BOOL)encrypted {
     NSError *error1 = nil;
-    id serializedObject = [JsonObject serializedObjectWithContentOfFile:filePath error:&error1 encrypted:encrypted];
+    id serializedObject = [JsonObject serializedObjectWithContentOfFile:filePath error:&error1];
     if (error1) {
         if (error != NULL) {
             *error = error1;
@@ -436,7 +414,7 @@ FAILED_TO_DECODE:
         if (error != NULL) {
             *error = [NSError errorWithDomain:NSOSStatusErrorDomain
                                          code:-10875
-                                     userInfo:@{NSLocalizedDescriptionKey:@"文件不存在或为空"}];
+                                     userInfo:@{NSLocalizedDescriptionKey:@"File does not exist or is empty."}];
         }
         return nil;
     }
@@ -444,7 +422,7 @@ FAILED_TO_DECODE:
         if (error != NULL) {
             *error = [NSError errorWithDomain:NSCocoaErrorDomain
                                          code:-1
-                                     userInfo:@{NSLocalizedDescriptionKey:@"无法解析数据"}];
+                                     userInfo:@{NSLocalizedDescriptionKey:@"Failed to unarchive data."}];
         }
         return nil;
     }
@@ -452,15 +430,11 @@ FAILED_TO_DECODE:
 }
 
 + (id _Nullable)serializedObjectWithContentOfFile:(NSString *)filePath error:(NSError **)error {
-    return [self serializedObjectWithContentOfFile:filePath error:error encrypted:NO];
-}
-
-+ (id _Nullable)serializedObjectWithContentOfFile:(NSString *)filePath error:(NSError **)error encrypted:(BOOL)encrypted {
     if (filePath.length == 0) {
         if (error != NULL) {
             *error = [NSError errorWithDomain:NSOSStatusErrorDomain
                                          code:-10875
-                                     userInfo:@{NSLocalizedDescriptionKey:@"无效的文件路径"}];
+                                     userInfo:@{NSLocalizedDescriptionKey:@"Invalid file path."}];
         }
         return nil;
     }
@@ -478,17 +452,9 @@ FAILED_TO_DECODE:
         if (error != NULL) {
             *error = [NSError errorWithDomain:NSOSStatusErrorDomain
                                          code:-10875
-                                     userInfo:@{NSLocalizedDescriptionKey:@"文件不存在或为空"}];
+                                     userInfo:@{NSLocalizedDescriptionKey:@"File does not exist or is empty."}];
         }
         return nil;
-    }
-    
-    if (encrypted) {
-        int length = (int)data.length;
-        Byte *buffer = malloc(length);
-        decrypt_binary(data.bytes, buffer, length);
-        data = [NSData dataWithBytes:buffer length:length];
-        free(buffer);
     }
     
     id serialzedObject = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error1];
